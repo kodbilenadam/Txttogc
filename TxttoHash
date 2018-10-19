@@ -1,0 +1,48 @@
+require "json"
+
+text = File.read("textfile.txt")
+hash = {}
+lastDate = ""
+text.each_line do |line|
+puts line
+  # Tarih
+  if (line.include?("Pazartesi") || line.include?("Salı") || line.include?("Çarşamba") || line.include?("Perşembe") || line.include?("Cuma"))
+    hash[line.strip] = []
+    lastDate = line.strip
+  else
+    saat = line.scan(/\d\d:\d\d/)
+    # Saat
+    if saat == []
+      lastLine = hash[lastDate].last
+      # İstisna
+      if lastLine != nil
+        lastLine[2] = "#{lastLine[2]} #{line.strip}"
+      else
+        hash[lastDate] << ["08:40", "17:20", line.strip]
+      end
+    else
+      hash[lastDate] << [saat[0], saat[1], line[(line.rindex(saat[1]) + 5)...-1].strip]
+    end
+  end
+end
+
+system("clear")
+
+# TEST
+hash.each do |a,b|
+
+  puts "\n"
+  puts a
+  puts "\n"
+  b.each do |c|
+    puts "#{c[0]} - #{c[1]}  -> #{c[2]}"
+  end
+end
+
+# WRITE
+
+puts "Hash kaydedilecek onaylıyor musunuz?"
+gets
+File.write("hashfile.json", hash.to_json)
+puts "Kaydedildi."
+# OSMAN KAYA - 2018

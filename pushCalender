@@ -1,0 +1,96 @@
+require 'google/apis/calendar_v3'
+require 'googleauth'
+require 'googleauth/stores/file_token_store'
+require 'fileutils'
+
+OOB_URI = 'urn:ietf:wg:oauth:2.0:oob'.freeze
+APPLICATION_NAME = 'PdfToHash'.freeze
+CREDENTIALS_PATH = 'credentials.json'.freeze
+TOKEN_PATH = 'token.yaml'.freeze
+SCOPE = Google::Apis::CalendarV3::AUTH_CALENDAR
+
+##
+# Ensure valid credentials, either by restoring from the saved credentials
+# files or intitiating an OAuth2 authorization. If authorization is required,
+# the user's default browser will be launched to approve the request.
+#
+# @return [Google::Auth::UserRefreshCredentials] OAuth2 credentials
+def authorize
+  client_id = Google::Auth::ClientId.from_file(CREDENTIALS_PATH)
+  token_store = Google::Auth::Stores::FileTokenStore.new(file: TOKEN_PATH)
+  authorizer = Google::Auth::UserAuthorizer.new(client_id, SCOPE, token_store)
+  user_id = 'default'
+  credentials = authorizer.get_credentials(user_id)
+  if credentials.nil?
+    url = authorizer.get_authorization_url(base_url: OOB_URI)
+    puts 'Open the following URL in the browser and enter the ' \
+         "resulting code after authorization:\n" + url
+    code = gets
+    credentials = authorizer.get_and_store_credentials_from_code(
+      user_id: user_id, code: code, base_url: OOB_URI
+    )
+  end
+  credentials
+end
+
+# Initialize the API
+service = Google::Apis::CalendarV3::CalendarService.new
+service.client_options.application_name = APPLICATION_NAME
+service.authorization = authorize
+
+# LETZ PUSH HASH TO CALENDAR
+text = JSON.parse(File.read("hashfile.json"))
+text.each do |tarih, dersler|
+  arrtar = tarih.split
+  numerik_ay = case arrtar[1].downcase
+                when "ocak"
+                  "01"
+                when "şubat"
+                  "02"
+                when "mart"
+                  "03"
+                when "nisan"
+                  "04"
+                when "mayıs"
+                  "05"
+                when "haziran"
+                  "06"
+                when "temmuz"
+                  "07"
+                when "ağustos"
+                  "08"
+                when "eylül"
+                  "09"
+                when "ekim"
+                  "10"
+                when "kasım"
+                  "11"
+                when "aralık"
+                  "12"
+                end
+  puts "\n"
+  puts "#{arrtar[0]} #{numerik_ay} #{arrtar[2]}"
+  puts "\n"
+  dersler.each do |ders|
+    print "#{ders[2]}...    "
+    startSaat = ders[0].split(":")
+    endSaat = ders[1].split(":")
+
+    event = Google::Apis::CalendarV3::Event.new({
+      :summary => "#{ders[2]}",
+      :location => "Kocaeli Üniversitesi Tıp Fakültesi",
+      :start => {
+        :date_time => Time.new(arrtar[2], numerik_ay, arrtar[0], startSaat[0], startSaat[1], 0, "+03:00").to_datetime.rfc3339
+      },
+      :end => {
+        :date_time => Time.new(arrtar[2], numerik_ay, arrtar[0], endSaat[0], endSaat[1], 0, "+03:00").to_datetime.rfc3339
+      }
+    })
+    result = service.insert_event('gu5pat2d4gvqpi60nnq4es43k8@group.calendar.google.com', event)
+    if result.status != "confirmed"
+      print "Hata!.."
+      redo
+    end
+    puts "Başarılı!"
+  end
+end
